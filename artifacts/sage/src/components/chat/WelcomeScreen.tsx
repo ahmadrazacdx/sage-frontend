@@ -1,13 +1,15 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { SAGE_MODES, type SageMode } from "@/lib/utils";
-import { Sparkles, GraduationCap } from "lucide-react";
+import { GraduationCap } from "lucide-react";
 
 interface WelcomeScreenProps {
   name: string;
+  selectedMode: SageMode;
+  onSelectMode: (mode: SageMode) => void;
 }
 
-export function WelcomeScreen({ name }: WelcomeScreenProps) {
+export function WelcomeScreen({ name, selectedMode, onSelectMode }: WelcomeScreenProps) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto h-full">
       <motion.div 
@@ -31,14 +33,20 @@ export function WelcomeScreen({ name }: WelcomeScreenProps) {
         transition={{ duration: 0.5, delay: 0.1 }}
         className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full"
       >
-        {SAGE_MODES.map((mode, i) => (
-          <div 
+        {SAGE_MODES.map((mode) => (
+          <button
+            type="button"
             key={mode.id}
-            className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-sidebar border border-sidebar-border hover:border-primary/30 hover:bg-white/5 transition-all cursor-default"
+            onClick={() => onSelectMode(mode.id as SageMode)}
+            className={`flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border transition-all ${
+              selectedMode === mode.id
+                ? "bg-primary/10 border-primary/40"
+                : "bg-sidebar border-sidebar-border hover:border-primary/30 hover:bg-white/5"
+            }`}
           >
             <span className="text-2xl mb-1">{mode.icon}</span>
             <span className="text-sm font-semibold text-foreground/80">{mode.name}</span>
-          </div>
+          </button>
         ))}
       </motion.div>
     </div>

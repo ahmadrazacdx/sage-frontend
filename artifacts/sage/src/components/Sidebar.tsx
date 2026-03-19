@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, Plus, File, Trash2, GraduationCap, ChevronLeft, ChevronRight, UploadCloud, CheckCircle2, Loader2, Menu } from "lucide-react";
+import { MessageSquare, Plus, File, Trash2, GraduationCap, ChevronLeft, CheckCircle2, Loader2, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { 
   useListSessions, 
@@ -8,9 +8,9 @@ import {
   useListDocuments, 
   useDeleteDocument, 
   useUploadDocuments,
-  useGetStatus 
+  type SystemStatus
 } from "@workspace/api-client-react";
-import { format, isToday, isYesterday, isThisWeek } from "date-fns";
+import { differenceInCalendarDays } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListSessionsQueryKey, getListDocumentsQueryKey } from "@workspace/api-client-react";
 
@@ -20,12 +20,12 @@ interface SidebarProps {
   onNewChat: () => void;
   isCollapsed: boolean;
   setCollapsed: (v: boolean) => void;
+  status?: SystemStatus;
 }
 
-export function Sidebar({ currentThreadId, onSelectThread, onNewChat, isCollapsed, setCollapsed }: SidebarProps) {
+export function Sidebar({ currentThreadId, onSelectThread, onNewChat, isCollapsed, setCollapsed, status }: SidebarProps) {
   const { data: sessions } = useListSessions();
   const { data: documents } = useListDocuments();
-  const { data: status } = useGetStatus({ query: { refetchInterval: 5000 } });
   
   const deleteSession = useDeleteSession();
   const deleteDocument = useDeleteDocument();
@@ -37,13 +37,16 @@ export function Sidebar({ currentThreadId, onSelectThread, onNewChat, isCollapse
 
   // Group sessions by date
   const groupedSessions = (sessions || []).reduce((acc, session) => {
-    const date = new Date(session.updated_at);
-    if (isToday(date)) acc.today.push(session);
-    else if (isYesterday(date)) acc.yesterday.push(session);
-    else if (isThisWeek(date)) acc.week.push(session);
-    else acc.older.push(session);
+    const updatedAt = new Date(session.updated_at);
+    const daysAgo = differenceInCalendarDays(new Date(), updatedAt);
+
+    if (daysAgo === 0) acc.today.push(session);
+    else if (daysAgo === 1) acc.yesterday.push(session);
+    else if (daysAgo >= 2 && daysAgo <= 7) acc.week.push(session);
+    else if (daysAgo >= 8 && daysAgo <= 30) acc.lastMonth.push(session);
+
     return acc;
-  }, { today: [], yesterday: [], week: [], older: [] } as Record<string, typeof sessions>);
+  }, { today: [], yesterday: [], week: [], lastMonth: [] } as Record<string, typeof sessions>);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
@@ -151,7 +154,7 @@ export function Sidebar({ currentThreadId, onSelectThread, onNewChat, isCollapse
           <SessionList title="Today" items={groupedSessions.today} />
           <SessionList title="Yesterday" items={groupedSessions.yesterday} />
           <SessionList title="This Week" items={groupedSessions.week} />
-          <SessionList title="Older" items={groupedSessions.older} />
+          <SessionList title="Last Month" items={groupedSessions.lastMonth} />
         </div>
 
         <div className="px-4 py-4 mt-2">

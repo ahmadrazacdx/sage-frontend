@@ -74,6 +74,9 @@ export function initMocks() {
     }
     if (url.includes('/api/chat') && method === 'POST') {
       const body = JSON.parse(init?.body as string || '{}');
+      if (MOCK_STATUS.model_ready === false) {
+        return jsonResponse({ detail: 'Model not ready. Please wait.' }, 503);
+      }
       const thread_id = body.thread_id || uuidv4();
       return jsonResponse({ thread_id, message_id: uuidv4() });
     }
@@ -88,25 +91,38 @@ export function initMocks() {
   };
 }
 
-export function mockStream(onEvent: (data: any) => void, onDone: () => void) {
+type MockStreamEvent =
+  | { type: "thinking"; text: string }
+  | { type: "tool_call"; name: string }
+  | { type: "chunk"; text: string }
+  | { type: "error"; message: string }
+  | { type: "done" };
+
+export function mockStream(
+  onChunk: (text: string) => void,
+  onDone: () => void,
+  onEvent?: (event: MockStreamEvent) => void,
+) {
   const text = "Binary search is an efficient algorithm for finding an item in a **sorted** list.\n\n**Time Complexity:** $O(\\log n)$\n\nHere's an example:\n```python\ndef binary_search(arr, target):\n    lo, hi = 0, len(arr) - 1\n    while lo <= hi:\n        mid = lo + (hi - lo) // 2\n        if arr[mid] == target: return mid\n        elif arr[mid] < target: lo = mid + 1\n        else: hi = mid - 1\n    return -1\n```\n\n```mermaid\ngraph TD;\n    A[10] --> B[5];\n    A --> C[15];\n    B --> D[2];\n    B --> E[7];\n```";
   
   const tokens = text.split(' ');
   let i = 0;
   
   // Simulate thinking first
-  onEvent({ type: 'thinking', text: 'Analyzing the request...' });
+  onEvent?.({ type: "thinking", text: "Analyzing the request..." });
   
   setTimeout(() => {
-    onEvent({ type: 'tool_call', tool_name: 'corpus_search' });
+    onEvent?.({ type: "tool_call", name: "corpus_search" });
     
     setTimeout(() => {
       const interval = setInterval(() => {
         if (i < tokens.length) { 
-          onEvent({ type: 'chunk', text: tokens[i++] + ' ' });
+          const chunk = tokens[i++] + " ";
+          onChunk(chunk);
+          onEvent?.({ type: "chunk", text: chunk });
         } else { 
           clearInterval(interval); 
-          onEvent({ type: 'done' });
+          onEvent?.({ type: "done" });
           onDone(); 
         }
       }, 50);

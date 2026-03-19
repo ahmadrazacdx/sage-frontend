@@ -3,16 +3,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github-dark.css";
-import mermaid from "mermaid";
 import { v4 as uuidv4 } from "uuid";
 import { cn } from "@/lib/utils";
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: "dark",
-  securityLevel: "loose",
-  fontFamily: "Inter, sans-serif",
-});
+let mermaidModule: Awaited<ReturnType<typeof import("mermaid")>> | null = null;
+let mermaidInitialized = false;
 
 const MermaidRender = ({ code }: { code: string }) => {
   const id = useRef(`mermaid-${uuidv4()}`);
@@ -24,7 +19,21 @@ const MermaidRender = ({ code }: { code: string }) => {
     let isMounted = true;
     const renderDiagram = async () => {
       try {
-        const { svg: renderedSvg } = await mermaid.render(id.current, code);
+        if (!mermaidModule) {
+          mermaidModule = await import("mermaid");
+        }
+
+        if (!mermaidInitialized) {
+          mermaidModule.default.initialize({
+            startOnLoad: false,
+            theme: "dark",
+            securityLevel: "loose",
+            fontFamily: "Inter, sans-serif",
+          });
+          mermaidInitialized = true;
+        }
+
+        const { svg: renderedSvg } = await mermaidModule.default.render(id.current, code);
         if (isMounted) {
           setSvg(renderedSvg);
           setError(false);

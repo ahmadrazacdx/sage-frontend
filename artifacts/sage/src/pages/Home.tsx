@@ -6,10 +6,10 @@ import { Markdown } from "@/components/Markdown";
 import { FirstRun } from "@/components/setup/FirstRun";
 import { ModelLoading } from "@/components/setup/ModelLoading";
 import { useChatStream } from "@/hooks/use-chat-stream";
-import { useGetStatus, useGetSessionMessages, useSubmitChat, useListSessions } from "@workspace/api-client-react";
+import { useGetStatus, useGetSessionMessages, useSubmitChat, type SystemStatus } from "@workspace/api-client-react";
 import { GraduationCap, BrainCircuit } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { TOOL_NAMES } from "@/lib/utils";
+import { TOOL_NAMES, type SageMode } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListSessionsQueryKey } from "@workspace/api-client-react";
 
@@ -25,6 +25,8 @@ export default function Home() {
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<LocalMessage[]>([]);
   const [isStreamDone, setIsStreamDone] = useState(false);
+  const [composerMode, setComposerMode] = useState<SageMode>("general");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
@@ -64,15 +66,18 @@ export default function Home() {
     setCurrentThreadId(threadId);
     setOptimisticMessages([]);
     setIsStreamDone(true);
+    setSubmitError(null);
   }, []);
 
   const handleNewChat = useCallback(() => {
     setCurrentThreadId(null);
     setOptimisticMessages([]);
     setIsStreamDone(false);
+    setSubmitError(null);
   }, []);
 
-  const handleSend = async (message: string, mode: string, course: string) => {
+  const handleSend = async (message: string, mode: SageMode, course: string) => {
+    setSubmitError(null);
     setIsStreamDone(false);
     setOptimisticMessages(prev => [...prev, { role: "user", content: message }]);
 
@@ -83,21 +88,38 @@ export default function Home() {
 
       setCurrentThreadId(response.thread_id);
 
-      startStream(response.thread_id, () => {
+      startStream(response.thread_id, (finalAssistantContent) => {
+        if (finalAssistantContent.trim()) {
+          setOptimisticMessages(prev => [...prev, { role: "assistant", content: finalAssistantContent }]);
+        }
         setIsStreamDone(true);
-        setOptimisticMessages([]);
         queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
       });
     } catch (err) {
-      console.error("Failed to send message", err);
-      setOptimisticMessages([]);
+      const error = err as {
+        status?: number;
+        data?: { detail?: string };
+        message?: string;
+      };
+      if (error?.status === 503) {
+        setSubmitError(error.data?.detail ?? "Model is loading, please wait.");
+      } else {
+        setSubmitError(error?.data?.detail ?? error?.message ?? "Failed to send message.");
+      }
+      setIsStreamDone(true);
     }
   };
+
+  useEffect(() => {
+    if (isStreamDone && historyMessages) {
+      setOptimisticMessages([]);
+    }
+  }, [isStreamDone, historyMessages]);
 
   if (!isFirstRunCheckDone) return null;
   if (!userName) return <FirstRun onComplete={setUserName} />;
 
-  const isModelLoading = status && status.model_ready === false;
+  const isModelLoading = status?.model_ready !== true;
 
   const displayMessages: LocalMessage[] = isStreamDone && historyMessages
     ? historyMessages as LocalMessage[]
@@ -117,6 +139,7 @@ export default function Home() {
             onNewChat={handleNewChat}
             isCollapsed={sidebarCollapsed}
             setCollapsed={handleSidebarToggle}
+            status={status}
           />
         )}
       </AnimatePresence>
@@ -136,7 +159,7 @@ export default function Home() {
       <main className="flex-1 flex flex-col h-full relative min-w-0">
         <div className="flex-1 overflow-y-auto custom-scrollbar pb-36">
           {!hasMessages ? (
-            <WelcomeScreen name={userName} />
+            <WelcomeScreen name={userName} selectedMode={composerMode} onSelectMode={setComposerMode} />
           ) : (
             <div className="max-w-[780px] mx-auto w-full px-4 py-8 flex flex-col gap-6">
               {displayMessages.map((msg, idx) => (
@@ -164,7 +187,7 @@ export default function Home() {
                 </motion.div>
               ))}
 
-              {(streamState.isStreaming || streamState.content || streamState.error) && (
+              {(streamState.isStreaming || streamState.error) && (
                 <motion.div
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -210,6 +233,12 @@ export default function Home() {
                 </motion.div>
               )}
 
+              {submitError && (
+                <div className="text-error text-sm p-3 bg-error/10 border border-error/20 rounded-lg max-w-[780px]">
+                  ⚠️ {submitError}
+                </div>
+              )}
+
               <div ref={messagesEndRef} className="h-2" />
             </div>
           )}
@@ -218,7 +247,9 @@ export default function Home() {
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background via-background/95 to-transparent">
           <Composer
             onSend={handleSend}
-            disabled={streamState.isStreaming || submitChat.isPending || !!isModelLoading}
+            selectedMode={composerMode}
+            onModeChange={setComposerMode}
+            disabled={streamState.isStreaming || submitChat.isPending || isModelLoading}
           />
         </div>
       </main>

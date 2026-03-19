@@ -1,15 +1,17 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Settings2, Sparkles, ChevronUp, Bot, FileText, Blocks, BarChart2, Map, Search, Wrench, BrainCircuit } from "lucide-react";
+import { Send, Sparkles, Bot, FileText, Blocks, BarChart2, Map, Search, Wrench, BrainCircuit } from "lucide-react";
 import { SAGE_MODES, type SageMode, cn } from "@/lib/utils";
 import { useGetCourses } from "@workspace/api-client-react";
 
 interface ComposerProps {
   onSend: (message: string, mode: SageMode, course: string) => void;
   disabled: boolean;
+  selectedMode?: SageMode;
+  onModeChange?: (mode: SageMode) => void;
 }
 
-export function Composer({ onSend, disabled }: ComposerProps) {
+export function Composer({ onSend, disabled, selectedMode, onModeChange }: ComposerProps) {
   const [message, setMessage] = useState("");
   const [mode, setMode] = useState<SageMode>("general");
   const [course, setCourse] = useState("all");
@@ -21,6 +23,12 @@ export function Composer({ onSend, disabled }: ComposerProps) {
   const courses = ["all", ...(coursesData?.courses || [])];
 
   const currentModeObj = SAGE_MODES.find(m => m.id === mode)!;
+
+  useEffect(() => {
+    if (selectedMode && selectedMode !== mode) {
+      setMode(selectedMode);
+    }
+  }, [selectedMode, mode]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -65,6 +73,11 @@ export function Composer({ onSend, disabled }: ComposerProps) {
       case 'thinking': return <BrainCircuit className="w-4 h-4" />;
       default: return <Sparkles className="w-4 h-4" />;
     }
+  };
+
+  const setModeAndNotify = (nextMode: SageMode) => {
+    setMode(nextMode);
+    onModeChange?.(nextMode);
   };
 
   return (
@@ -114,7 +127,7 @@ export function Composer({ onSend, disabled }: ComposerProps) {
                 {SAGE_MODES.map((m) => (
                   <button
                     key={m.id}
-                    onClick={() => { setMode(m.id as SageMode); setModeSelectorOpen(false); }}
+                    onClick={() => { setModeAndNotify(m.id as SageMode); setModeSelectorOpen(false); }}
                     className={cn(
                       "flex items-center gap-3 w-full px-3 py-2.5 text-sm text-left transition-colors",
                       mode === m.id ? "bg-primary/10 text-primary" : "text-foreground hover:bg-white/5"
