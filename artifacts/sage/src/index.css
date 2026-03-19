@@ -197,8 +197,8 @@
 /* User message bubble */
 .user-bubble {
   background-color: #2b3445;
-  border-radius: 1.25rem;
-  border-bottom-right-radius: 0.25rem;
+  border-radius: 1.6rem;
+  border-bottom-right-radius: 0.75rem;
   color: #e0e0e0;
 }
 

@@ -107,25 +107,42 @@ export function mockStream(
   
   const tokens = text.split(' ');
   let i = 0;
+  let cancelled = false;
+  let stageOneTimeout: ReturnType<typeof setTimeout> | null = null;
+  let stageTwoTimeout: ReturnType<typeof setTimeout> | null = null;
+  let interval: ReturnType<typeof setInterval> | null = null;
   
   // Simulate thinking first
   onEvent?.({ type: "thinking", text: "Analyzing the request..." });
   
-  setTimeout(() => {
+  stageOneTimeout = setTimeout(() => {
+    if (cancelled) return;
     onEvent?.({ type: "tool_call", name: "corpus_search" });
     
-    setTimeout(() => {
-      const interval = setInterval(() => {
+    stageTwoTimeout = setTimeout(() => {
+      if (cancelled) return;
+      interval = setInterval(() => {
+        if (cancelled) {
+          if (interval) clearInterval(interval);
+          return;
+        }
         if (i < tokens.length) { 
           const chunk = tokens[i++] + " ";
           onChunk(chunk);
           onEvent?.({ type: "chunk", text: chunk });
         } else { 
-          clearInterval(interval); 
+          if (interval) clearInterval(interval);
           onEvent?.({ type: "done" });
           onDone(); 
         }
       }, 50);
     }, 1000);
   }, 500);
+
+  return () => {
+    cancelled = true;
+    if (stageOneTimeout) clearTimeout(stageOneTimeout);
+    if (stageTwoTimeout) clearTimeout(stageTwoTimeout);
+    if (interval) clearInterval(interval);
+  };
 }

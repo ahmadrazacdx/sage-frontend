@@ -11,7 +11,7 @@ import { GraduationCap, BrainCircuit } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TOOL_NAMES, type SageMode } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { getListSessionsQueryKey } from "@workspace/api-client-react";
+import { getListSessionsQueryKey, getGetStatusQueryKey, getGetSessionMessagesQueryKey } from "@workspace/api-client-react";
 
 interface LocalMessage {
   role: "user" | "assistant";
@@ -27,16 +27,19 @@ export default function Home() {
   const [isStreamDone, setIsStreamDone] = useState(false);
   const [composerMode, setComposerMode] = useState<SageMode>("general");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [chatResetKey, setChatResetKey] = useState(0);
+  const [stoppedManually, setStoppedManually] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  const { streamState, startStream } = useChatStream();
+  const { streamState, startStream, stopStream } = useChatStream();
 
-  const { data: status } = useGetStatus({ query: { refetchInterval: 5000 } });
+  const { data: status } = useGetStatus({ query: { queryKey: getGetStatusQueryKey(), refetchInterval: 5000 } });
 
   const { data: historyMessages } = useGetSessionMessages(currentThreadId || "", {
     query: {
+      queryKey: getGetSessionMessagesQueryKey(currentThreadId || ""),
       enabled: !!currentThreadId && isStreamDone,
     }
   });
@@ -67,6 +70,7 @@ export default function Home() {
     setOptimisticMessages([]);
     setIsStreamDone(true);
     setSubmitError(null);
+    setStoppedManually(false);
   }, []);
 
   const handleNewChat = useCallback(() => {
@@ -74,12 +78,19 @@ export default function Home() {
     setOptimisticMessages([]);
     setIsStreamDone(false);
     setSubmitError(null);
+    setStoppedManually(false);
+    setChatResetKey((prev) => prev + 1);
   }, []);
 
   const handleSend = async (message: string, mode: SageMode, course: string) => {
     setSubmitError(null);
+    setStoppedManually(false);
     setIsStreamDone(false);
-    setOptimisticMessages(prev => [...prev, { role: "user", content: message }]);
+
+    const baseMessages: LocalMessage[] = historyList && canUseHistory
+      ? historyList
+      : optimisticMessages;
+    setOptimisticMessages([...baseMessages, { role: "user", content: message }]);
 
     try {
       const response = await submitChat.mutateAsync({
@@ -110,19 +121,41 @@ export default function Home() {
     }
   };
 
+  const handleStopGeneration = useCallback(() => {
+    if (!streamState.isStreaming) return;
+
+    const partialContent = streamState.content;
+    stopStream();
+    setStoppedManually(true);
+
+    if (partialContent.trim()) {
+      setOptimisticMessages((prev) => [...prev, { role: "assistant", content: partialContent }]);
+    }
+
+    setIsStreamDone(true);
+    queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
+  }, [streamState.isStreaming, streamState.content, stopStream, queryClient]);
+
+  const historyList = (historyMessages as LocalMessage[] | undefined) ?? undefined;
+  const canUseHistory =
+    isStreamDone &&
+    !stoppedManually &&
+    !!historyList &&
+    (optimisticMessages.length === 0 || historyList.length >= optimisticMessages.length);
+
   useEffect(() => {
-    if (isStreamDone && historyMessages) {
+    if (canUseHistory) {
       setOptimisticMessages([]);
     }
-  }, [isStreamDone, historyMessages]);
+  }, [canUseHistory]);
 
   if (!isFirstRunCheckDone) return null;
   if (!userName) return <FirstRun onComplete={setUserName} />;
 
   const isModelLoading = status?.model_ready !== true;
 
-  const displayMessages: LocalMessage[] = isStreamDone && historyMessages
-    ? historyMessages as LocalMessage[]
+  const displayMessages: LocalMessage[] = canUseHistory && historyList
+    ? historyList
     : optimisticMessages;
 
   const hasMessages = displayMessages.length > 0 || streamState.isStreaming || !!streamState.content;
@@ -159,9 +192,9 @@ export default function Home() {
       <main className="flex-1 flex flex-col h-full relative min-w-0">
         <div className="flex-1 overflow-y-auto custom-scrollbar pb-36">
           {!hasMessages ? (
-            <WelcomeScreen name={userName} selectedMode={composerMode} onSelectMode={setComposerMode} />
+            <WelcomeScreen name={userName} />
           ) : (
-            <div className="max-w-[780px] mx-auto w-full px-4 py-8 flex flex-col gap-6">
+            <div className="max-w-[680px] mx-auto w-full px-4 py-8 flex flex-col gap-6">
               {displayMessages.map((msg, idx) => (
                 <motion.div
                   initial={{ opacity: 0, y: 6 }}
@@ -223,7 +256,7 @@ export default function Home() {
                     ) : (
                       <div className={streamState.isStreaming && !streamState.content ? "typing-cursor-empty" : (streamState.isStreaming ? "typing-cursor" : "")}>
                         {streamState.content ? (
-                          <Markdown content={streamState.content} />
+                          <Markdown content={streamState.content} enableMermaid={!streamState.isStreaming} />
                         ) : streamState.isStreaming ? (
                           <span className="text-muted-foreground text-sm">Thinking...</span>
                         ) : null}
@@ -234,7 +267,7 @@ export default function Home() {
               )}
 
               {submitError && (
-                <div className="text-error text-sm p-3 bg-error/10 border border-error/20 rounded-lg max-w-[780px]">
+                <div className="text-error text-sm p-3 bg-error/10 border border-error/20 rounded-lg max-w-[680px]">
                   ⚠️ {submitError}
                 </div>
               )}
@@ -247,9 +280,12 @@ export default function Home() {
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background via-background/95 to-transparent">
           <Composer
             onSend={handleSend}
+            onStopStreaming={handleStopGeneration}
             selectedMode={composerMode}
             onModeChange={setComposerMode}
-            disabled={streamState.isStreaming || submitChat.isPending || isModelLoading}
+            resetSelectionKey={chatResetKey}
+            isStreaming={streamState.isStreaming}
+            disabled={submitChat.isPending || isModelLoading}
           />
         </div>
       </main>

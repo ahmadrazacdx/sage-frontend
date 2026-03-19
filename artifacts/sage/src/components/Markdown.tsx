@@ -64,7 +64,14 @@ const MermaidRender = ({ code }: { code: string }) => {
   );
 };
 
-export const Markdown = ({ content, className }: { content: string, className?: string }) => {
+interface MarkdownProps {
+  content: string;
+  className?: string;
+  enableMermaid?: boolean;
+}
+
+export const Markdown = ({ content, className, enableMermaid = true }: MarkdownProps) => {
+
   return (
     <div className={cn("prose prose-invert max-w-none break-words", className)}>
       <ReactMarkdown
@@ -75,7 +82,7 @@ export const Markdown = ({ content, className }: { content: string, className?: 
             const match = /language-(\w+)/.exec(codeClassName || "");
             const language = match ? match[1] : "";
 
-            if (language === "mermaid") {
+            if (language === "mermaid" && enableMermaid) {
               return <MermaidRender code={String(children).replace(/\n$/, "")} />;
             }
 

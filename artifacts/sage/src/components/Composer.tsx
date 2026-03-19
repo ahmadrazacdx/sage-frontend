@@ -1,34 +1,44 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, Bot, FileText, Blocks, BarChart2, Map, Search, Wrench, BrainCircuit } from "lucide-react";
+import { Send, Plus, ChevronRight, Check, X, Square } from "lucide-react";
 import { SAGE_MODES, type SageMode, cn } from "@/lib/utils";
 import { useGetCourses } from "@workspace/api-client-react";
 
 interface ComposerProps {
   onSend: (message: string, mode: SageMode, course: string) => void;
+  onStopStreaming?: () => void;
   disabled: boolean;
+  isStreaming?: boolean;
   selectedMode?: SageMode;
   onModeChange?: (mode: SageMode) => void;
+  resetSelectionKey?: number;
 }
 
-export function Composer({ onSend, disabled, selectedMode, onModeChange }: ComposerProps) {
+export function Composer({ onSend, onStopStreaming, disabled, isStreaming = false, selectedMode, onModeChange, resetSelectionKey }: ComposerProps) {
   const [message, setMessage] = useState("");
   const [mode, setMode] = useState<SageMode>("general");
   const [course, setCourse] = useState("all");
   const [modeSelectorOpen, setModeSelectorOpen] = useState(false);
+  const [coursesOpen, setCoursesOpen] = useState(false);
+  const [coursesOpenUpward, setCoursesOpenUpward] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const selectorRef = useRef<HTMLDivElement>(null);
 
   const { data: coursesData } = useGetCourses();
-  const courses = ["all", ...(coursesData?.courses || [])];
+  const courses = [{ value: "all", label: "Default" }, ...(coursesData?.courses || []).map((courseCode) => ({ value: courseCode, label: courseCode }))];
 
   const currentModeObj = SAGE_MODES.find(m => m.id === mode)!;
+  const isComposerDisabled = disabled || isStreaming;
 
   useEffect(() => {
     if (selectedMode && selectedMode !== mode) {
       setMode(selectedMode);
     }
   }, [selectedMode, mode]);
+
+  useEffect(() => {
+    setCourse("all");
+  }, [resetSelectionKey]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -44,6 +54,7 @@ export function Composer({ onSend, disabled, selectedMode, onModeChange }: Compo
     const handleClickOutside = (e: MouseEvent) => {
       if (selectorRef.current && !selectorRef.current.contains(e.target as Node)) {
         setModeSelectorOpen(false);
+        setCoursesOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -53,7 +64,7 @@ export function Composer({ onSend, disabled, selectedMode, onModeChange }: Compo
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (message.trim() && !disabled) {
+      if (message.trim() && !isComposerDisabled) {
         onSend(message.trim(), mode, course);
         setMessage("");
         if (textareaRef.current) textareaRef.current.style.height = "24px";
@@ -61,58 +72,106 @@ export function Composer({ onSend, disabled, selectedMode, onModeChange }: Compo
     }
   };
 
-  const getModeIcon = (id: string) => {
-    switch(id) {
-      case 'general': return <Bot className="w-4 h-4" />;
-      case 'explain': return <FileText className="w-4 h-4" />;
-      case 'quiz': return <Blocks className="w-4 h-4" />;
-      case 'diagram': return <BarChart2 className="w-4 h-4" />;
-      case 'roadmap': return <Map className="w-4 h-4" />;
-      case 'research': return <Search className="w-4 h-4" />;
-      case 'fix': return <Wrench className="w-4 h-4" />;
-      case 'thinking': return <BrainCircuit className="w-4 h-4" />;
-      default: return <Sparkles className="w-4 h-4" />;
-    }
-  };
-
   const setModeAndNotify = (nextMode: SageMode) => {
     setMode(nextMode);
     onModeChange?.(nextMode);
+    setModeSelectorOpen(false);
+    setCoursesOpen(false);
+  };
+
+  const clearModeSelection = () => {
+    setModeAndNotify("general");
+  };
+
+  const selectedCourseLabel = courses.find((courseOption) => courseOption.value === course)?.label ?? "Default";
+
+  const setCourseAndClose = (nextCourse: string) => {
+    setCourse(nextCourse);
+    setModeSelectorOpen(false);
+    setCoursesOpen(false);
   };
 
   return (
-    <div className="relative w-full max-w-[780px] mx-auto">
-      {/* Course & Mode Indicator */}
+    <div className="relative w-full max-w-[680px] mx-auto">
       <div className="flex items-center gap-2 mb-2 px-1">
-        <select 
-          value={course} 
-          onChange={(e) => setCourse(e.target.value)}
-          disabled={disabled}
-          className="bg-transparent text-xs text-muted-foreground hover:text-foreground font-medium outline-none cursor-pointer appearance-none"
-        >
-          <option value="all">All Courses</option>
-          {courses.filter(c => c !== 'all').map(c => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-        <span className="text-border text-xs">•</span>
-        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-          {getModeIcon(mode)} {currentModeObj.name} Mode
+        <div className="inline-flex items-center gap-1.5 bg-sidebar border border-sidebar-border rounded-full px-2.5 py-1 text-xs text-foreground/90">
+          <span className="text-muted-foreground">Mode:</span>
+          <span className="font-medium">{currentModeObj.icon} {currentModeObj.name}</span>
+          {mode !== "general" && (
+            <button
+              type="button"
+              onClick={clearModeSelection}
+              disabled={isComposerDisabled}
+              className="ml-0.5 rounded-full p-0.5 text-muted-foreground hover:text-foreground hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Clear mode"
+              aria-label="Clear mode"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
+        <div className="inline-flex items-center gap-1.5 bg-sidebar border border-sidebar-border rounded-full px-2.5 py-1 text-xs text-foreground/90">
+          <span className="text-muted-foreground">Course:</span>
+          <span className="font-medium">{selectedCourseLabel}</span>
         </div>
       </div>
 
-      <div className={cn(
-        "relative flex items-end w-full rounded-[24px] bg-input border-2 transition-colors duration-200 shadow-lg shadow-black/20",
-        disabled ? "border-border/50 opacity-60" : "border-border focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10"
-      )}>
-        {/* Mode Selector Toggle */}
-        <div className="relative p-2" ref={selectorRef}>
+      <div className="relative">
+        <div className={cn(
+          "relative flex items-end w-full rounded-[24px] bg-input border-2 transition-colors duration-200 shadow-lg shadow-black/20",
+          isComposerDisabled ? "border-border/50 opacity-60" : "border-border focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/10"
+        )}>
+
+          <textarea
+            ref={textareaRef}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isComposerDisabled}
+            placeholder={currentModeObj.placeholder}
+            className="flex-1 max-h-[200px] min-h-[24px] py-4 pl-4 bg-transparent text-foreground placeholder:text-muted-foreground outline-none resize-none overflow-y-auto"
+            rows={1}
+          />
+
+          <div className="p-2">
+            <button
+              onClick={() => {
+                if (isStreaming) {
+                  onStopStreaming?.();
+                  return;
+                }
+
+                if (message.trim() && !isComposerDisabled) {
+                  onSend(message.trim(), mode, course);
+                  setMessage("");
+                  if (textareaRef.current) textareaRef.current.style.height = "24px";
+                }
+              }}
+              disabled={isStreaming ? false : (isComposerDisabled || !message.trim())}
+              className={cn(
+                "flex items-center justify-center w-10 h-10 rounded-full transition-all shadow-md",
+                isStreaming
+                  ? "bg-destructive text-destructive-foreground hover:opacity-90"
+                  : "bg-accent text-accent-foreground hover:bg-white hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
+              )}
+            >
+              {isStreaming ? <Square className="w-4 h-4 fill-current" /> : <Send className="w-5 h-5 ml-0.5" />}
+            </button>
+          </div>
+        </div>
+
+        <div className="absolute left-0 top-1/2 -translate-x-[calc(100%+8px)] -translate-y-1/2" ref={selectorRef}>
           <button
-            onClick={() => !disabled && setModeSelectorOpen(!modeSelectorOpen)}
-            disabled={disabled}
-            className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => {
+              if (isComposerDisabled) return;
+              setModeSelectorOpen((prev) => !prev);
+              if (modeSelectorOpen) setCoursesOpen(false);
+            }}
+            disabled={isComposerDisabled}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-input border border-border hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
           >
-            {getModeIcon(mode)}
+            <Plus className="w-4 h-4" />
           </button>
 
           <AnimatePresence>
@@ -122,12 +181,12 @@ export function Composer({ onSend, disabled, selectedMode, onModeChange }: Compo
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="absolute bottom-14 left-0 w-48 bg-sidebar border border-sidebar-border rounded-xl shadow-2xl overflow-hidden z-50 py-1"
+                className="absolute bottom-14 left-0 w-52 bg-sidebar border border-sidebar-border rounded-xl shadow-2xl overflow-visible z-50 py-1"
               >
                 {SAGE_MODES.map((m) => (
                   <button
                     key={m.id}
-                    onClick={() => { setModeAndNotify(m.id as SageMode); setModeSelectorOpen(false); }}
+                    onClick={() => { setModeAndNotify(m.id as SageMode); }}
                     className={cn(
                       "flex items-center gap-3 w-full px-3 py-2.5 text-sm text-left transition-colors",
                       mode === m.id ? "bg-primary/10 text-primary" : "text-foreground hover:bg-white/5"
@@ -135,40 +194,65 @@ export function Composer({ onSend, disabled, selectedMode, onModeChange }: Compo
                   >
                     <span className="text-base">{m.icon}</span>
                     <span className="font-medium">{m.name}</span>
+                    {mode === m.id && <Check className="w-3.5 h-3.5 ml-auto" />}
                   </button>
                 ))}
+
+                <div className="h-px bg-sidebar-border my-1" />
+
+                <div
+                  className="relative"
+                  onMouseEnter={(e) => {
+                    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                    const estimatedSubmenuHeight = 220;
+                    setCoursesOpenUpward(window.innerHeight - rect.top < estimatedSubmenuHeight);
+                    setCoursesOpen(true);
+                  }}
+                  onMouseLeave={() => setCoursesOpen(false)}
+                >
+                  <button
+                    type="button"
+                    className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-left transition-colors text-foreground hover:bg-white/5"
+                  >
+                    <span className="text-base">📚</span>
+                    <span className="font-medium">Courses</span>
+                    <ChevronRight className="w-3.5 h-3.5 ml-auto" />
+                  </button>
+
+                  <AnimatePresence>
+                    {coursesOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, x: 8, scale: 0.98 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, x: 8, scale: 0.98 }}
+                        transition={{ duration: 0.12 }}
+                        className={cn(
+                          "absolute left-full ml-2 w-48 max-h-[11rem] overflow-y-auto custom-scrollbar pr-1 bg-sidebar border border-sidebar-border rounded-xl shadow-2xl py-1",
+                          coursesOpenUpward ? "bottom-0" : "top-0"
+                        )}
+                      >
+                        {courses.map((courseOption) => (
+                          <button
+                            key={courseOption.value}
+                            onClick={() => setCourseAndClose(courseOption.value)}
+                            className={cn(
+                              "flex items-center w-full px-3 py-2 text-sm text-left transition-colors",
+                              course === courseOption.value
+                                ? "bg-primary/10 text-primary"
+                                : "text-foreground hover:bg-white/5"
+                            )}
+                          >
+                            <span>{courseOption.label}</span>
+                            {course === courseOption.value && <Check className="w-3.5 h-3.5 ml-auto" />}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-
-        {/* Textarea */}
-        <textarea
-          ref={textareaRef}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          placeholder={currentModeObj.placeholder}
-          className="flex-1 max-h-[200px] min-h-[24px] py-4 bg-transparent text-foreground placeholder:text-muted-foreground outline-none resize-none overflow-y-auto"
-          rows={1}
-        />
-
-        {/* Send Button */}
-        <div className="p-2">
-          <button
-            onClick={() => {
-              if (message.trim() && !disabled) {
-                onSend(message.trim(), mode, course);
-                setMessage("");
-                if (textareaRef.current) textareaRef.current.style.height = "24px";
-              }
-            }}
-            disabled={disabled || !message.trim()}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-accent text-accent-foreground hover:bg-white hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed transition-all shadow-md"
-          >
-            <Send className="w-5 h-5 ml-0.5" />
-          </button>
         </div>
       </div>
     </div>

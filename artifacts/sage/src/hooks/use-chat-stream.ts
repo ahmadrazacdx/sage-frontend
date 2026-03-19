@@ -21,6 +21,7 @@ export function useChatStream() {
   });
   
   const eventSourceRef = useRef<EventSource | null>(null);
+  const cancelMockRef = useRef<(() => void) | null>(null);
   const streamedContentRef = useRef("");
   const queryClient = useQueryClient();
 
@@ -35,11 +36,12 @@ export function useChatStream() {
     });
 
     if (import.meta.env.VITE_USE_MOCK !== 'false') {
-      mockStream((chunk) => {
+      cancelMockRef.current = mockStream((chunk) => {
         streamedContentRef.current += chunk;
         setStreamState(prev => ({ ...prev, content: prev.content + chunk }));
       }, () => {
         const finalContent = streamedContentRef.current;
+        cancelMockRef.current = null;
         setStreamState(prev => ({ ...prev, isStreaming: false, content: "", thinking: "", activeTool: null }));
         queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
         onComplete?.(finalContent);
@@ -98,8 +100,13 @@ export function useChatStream() {
   const stopStream = useCallback(() => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
-      setStreamState(prev => ({ ...prev, isStreaming: false, activeTool: null }));
+      eventSourceRef.current = null;
     }
+    if (cancelMockRef.current) {
+      cancelMockRef.current();
+      cancelMockRef.current = null;
+    }
+    setStreamState(prev => ({ ...prev, isStreaming: false, content: "", thinking: "", activeTool: null }));
   }, []);
 
   return { streamState, startStream, stopStream };
