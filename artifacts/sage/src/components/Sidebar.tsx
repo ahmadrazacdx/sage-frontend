@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, Plus, File, Trash2, GraduationCap, ChevronLeft, ChevronDown, ChevronRight, Folder, FolderOpen, CheckCircle2, Loader2, Menu } from "lucide-react";
+import { MessageSquare, Plus, File, Trash2, GraduationCap, ChevronLeft, ChevronDown, ChevronRight, CheckCircle2, Loader2, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { 
   useListSessions, 
@@ -167,11 +167,19 @@ export function Sidebar({ currentThreadId, onSelectThread, onNewChat, isCollapse
           <button
             type="button"
             onClick={() => setDocsExpanded((prev) => !prev)}
-            className="w-full flex items-center justify-between px-2 py-2 rounded-lg hover:bg-white/5 transition-colors"
+            className={cn(
+              "w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors",
+              docsExpanded
+                ? "bg-primary/12 border-primary/35"
+                : "bg-white/[0.03] border-sidebar-border hover:bg-white/[0.06]"
+            )}
           >
-            <div className="flex items-center gap-2">
-              {docsExpanded ? <FolderOpen className="w-4 h-4 text-primary" /> : <Folder className="w-4 h-4 text-muted-foreground" />}
-              <span className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">My Docs</span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-base leading-none" aria-hidden="true">📁</span>
+              <span className="text-xs font-extrabold tracking-wider text-foreground uppercase">MY DOCS</span>
+              <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
+                {documents?.length ?? 0}
+              </span>
             </div>
             {docsExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
           </button>
