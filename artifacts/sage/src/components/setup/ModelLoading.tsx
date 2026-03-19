@@ -20,7 +20,7 @@ export function ModelLoading() {
         <h2 className="text-xl font-bold text-foreground mb-2">Getting ready...</h2>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin" />
-          Loading local models into memory
+          Loading Models & Resources
         </div>
       </motion.div>
     </div>

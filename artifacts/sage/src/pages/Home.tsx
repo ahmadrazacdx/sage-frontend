@@ -7,7 +7,7 @@ import { FirstRun } from "@/components/setup/FirstRun";
 import { ModelLoading } from "@/components/setup/ModelLoading";
 import { useChatStream } from "@/hooks/use-chat-stream";
 import { useGetStatus, useGetSessionMessages, useSubmitChat, type SystemStatus } from "@workspace/api-client-react";
-import { GraduationCap, BrainCircuit } from "lucide-react";
+import { GraduationCap, BrainCircuit, X, Info, Github, Building2, Cpu, Database, WifiOff, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TOOL_NAMES, type SageMode } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
@@ -29,6 +29,8 @@ export default function Home() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [chatResetKey, setChatResetKey] = useState(0);
   const [stoppedManually, setStoppedManually] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsName, setSettingsName] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
@@ -58,6 +60,19 @@ export default function Home() {
     setSidebarCollapsed(collapsed);
     localStorage.setItem("sage_sidebar_collapsed", String(collapsed));
   };
+
+  const handleOpenSettings = useCallback(() => {
+    setSettingsName(userName || "");
+    setIsSettingsOpen(true);
+  }, [userName]);
+
+  const handleSaveSettings = useCallback(() => {
+    const trimmed = settingsName.trim();
+    if (!trimmed) return;
+    localStorage.setItem("sage_user_name", trimmed);
+    setUserName(trimmed);
+    setIsSettingsOpen(false);
+  }, [settingsName]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -170,6 +185,7 @@ export default function Home() {
             currentThreadId={currentThreadId}
             onSelectThread={handleSelectThread}
             onNewChat={handleNewChat}
+            onOpenSettings={handleOpenSettings}
             isCollapsed={sidebarCollapsed}
             setCollapsed={handleSidebarToggle}
             status={status}
@@ -289,6 +305,124 @@ export default function Home() {
           />
         </div>
       </main>
+
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setIsSettingsOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              className="w-full max-w-xl bg-sidebar border border-sidebar-border rounded-2xl shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-sidebar-border">
+                <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <Info className="w-5 h-5 text-primary" />
+                  About
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+                  aria-label="Close settings"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="px-6 py-5 space-y-5">
+                <div className="space-y-3 text-sm text-foreground/85 leading-relaxed">
+                  <p>
+                    Sage is an offline-first AI study assistant designed for higher-education workflows at Thal University Bhakkar.
+                    It combines guided tutoring, interactive study modes, and course-aware context to support daily learning with low friction.
+                  </p>
+                  <p>
+                    The platform prioritizes production-grade reliability through streamed responses, controlled mode/course selection,
+                    local personalization, and privacy-first behavior suitable for campus labs and personal systems.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    License: <span className="font-semibold text-foreground/90">Apache 2.0</span>
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                  <div className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-white/[0.03] px-3 py-2">
+                    <Cpu className="w-3.5 h-3.5 text-primary" />
+                    <span className="text-muted-foreground">Model:</span>
+                    <span className="font-medium text-foreground/90 ml-auto">{status?.model_name || "Unknown"}</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-white/[0.03] px-3 py-2">
+                    <Database className="w-3.5 h-3.5 text-primary" />
+                    <span className="text-muted-foreground">Embedding:</span>
+                    <span className="font-medium text-foreground/90 ml-auto">{status?.embedding_tier || "N/A"}</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-white/[0.03] px-3 py-2">
+                    <ShieldCheck className="w-3.5 h-3.5 text-primary" />
+                    <span className="text-muted-foreground">Collections:</span>
+                    <span className="font-medium text-foreground/90 ml-auto">{status?.vectordb_collections?.length ?? 0}</span>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-white/[0.03] px-3 py-2">
+                    <WifiOff className="w-3.5 h-3.5 text-primary" />
+                    <span className="text-muted-foreground">Network:</span>
+                    <span className="font-medium text-foreground/90 ml-auto">{status?.network_online ? "Online" : "Offline"}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="settings-name" className="text-sm font-medium text-foreground">
+                    Display Name
+                  </label>
+                  <input
+                    id="settings-name"
+                    type="text"
+                    value={settingsName}
+                    onChange={(e) => setSettingsName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="w-full rounded-xl bg-input border border-border px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <a href="https://github.com/ahmadrazacdx/Sage" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.04] border border-sidebar-border hover:bg-white/[0.1] transition-colors">
+                    <Github className="w-3.5 h-3.5" />
+                    GitHub
+                  </a>
+                  <a href="https://tu.edu.pk" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/[0.04] border border-sidebar-border hover:bg-white/[0.1] transition-colors">
+                    <Building2 className="w-3.5 h-3.5" />
+                    University
+                  </a>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-sidebar-border flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/10 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveSettings}
+                  disabled={!settingsName.trim()}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

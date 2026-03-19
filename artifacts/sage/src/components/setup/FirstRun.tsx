@@ -32,7 +32,7 @@ export function FirstRun({ onComplete }: FirstRunProps) {
         </div>
         
         <h1 className="text-3xl font-bold text-center mb-2 text-foreground">Welcome to Sage</h1>
-        <p className="text-center text-muted-foreground mb-8">Your offline AI study assistant.</p>
+        <p className="text-center text-muted-foreground mb-8">Your Offline AI Study Assistant.</p>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>

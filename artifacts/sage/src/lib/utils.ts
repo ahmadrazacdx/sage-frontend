@@ -8,12 +8,12 @@ export function cn(...inputs: ClassValue[]) {
 export const SAGE_MODES = [
   { id: "general", name: "General", icon: "🤖", placeholder: "Ask Sage anything..." },
   { id: "explain", name: "Explain", icon: "💬", placeholder: "Ask Sage to explain..." },
+  { id: "thinking", name: "Thinking", icon: "🧠", placeholder: "Ask Sage to think through..." },
   { id: "quiz", name: "Quiz Me", icon: "🧩", placeholder: "Ask Sage to quiz you on..." },
   { id: "diagram", name: "Diagram", icon: "📊", placeholder: "Ask Sage to diagram..." },
   { id: "roadmap", name: "Study Plan", icon: "📅", placeholder: "Ask Sage to plan your study..." },
-  { id: "research", name: "Research", icon: "🔬", placeholder: "Ask Sage to research..." },
   { id: "fix", name: "Fix Code", icon: "🔧", placeholder: "Paste code to fix..." },
-  { id: "thinking", name: "Thinking", icon: "🧠", placeholder: "Ask Sage to think through..." },
+  { id: "research", name: "Research", icon: "🔬", placeholder: "Ask Sage to research..." },
 ] as const;
 
 export type SageMode = typeof SAGE_MODES[number]["id"];

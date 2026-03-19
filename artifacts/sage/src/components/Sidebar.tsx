@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, Plus, File, Trash2, GraduationCap, ChevronLeft, ChevronDown, ChevronRight, CheckCircle2, Loader2, Menu } from "lucide-react";
+import { MessageSquare, Plus, File, Trash2, GraduationCap, ChevronLeft, ChevronDown, ChevronRight, Info, CheckCircle2, Loader2, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { 
   useListSessions, 
@@ -18,14 +18,22 @@ interface SidebarProps {
   currentThreadId: string | null;
   onSelectThread: (id: string) => void;
   onNewChat: () => void;
+  onOpenSettings: () => void;
   isCollapsed: boolean;
   setCollapsed: (v: boolean) => void;
   status?: SystemStatus;
 }
 
-export function Sidebar({ currentThreadId, onSelectThread, onNewChat, isCollapsed, setCollapsed, status }: SidebarProps) {
+export function Sidebar({ currentThreadId, onSelectThread, onNewChat, onOpenSettings, isCollapsed, setCollapsed, status }: SidebarProps) {
   const { data: sessions } = useListSessions();
   const { data: documents } = useListDocuments();
+  type SessionItem = NonNullable<typeof sessions>[number];
+  type SessionGroups = {
+    today: SessionItem[];
+    yesterday: SessionItem[];
+    week: SessionItem[];
+    lastMonth: SessionItem[];
+  };
   
   const deleteSession = useDeleteSession();
   const deleteDocument = useDeleteDocument();
@@ -47,7 +55,7 @@ export function Sidebar({ currentThreadId, onSelectThread, onNewChat, isCollapse
     else if (daysAgo >= 8 && daysAgo <= 30) acc.lastMonth.push(session);
 
     return acc;
-  }, { today: [], yesterday: [], week: [], lastMonth: [] } as Record<string, typeof sessions>);
+  }, { today: [], yesterday: [], week: [], lastMonth: [] } as SessionGroups);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
@@ -235,21 +243,30 @@ export function Sidebar({ currentThreadId, onSelectThread, onNewChat, isCollapse
               </div>
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="w-full mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.03] border border-sidebar-border text-sm text-foreground/90 hover:bg-white/[0.08] transition-colors"
+          >
+            <Info className="w-4 h-4 text-primary" />
+            <span className="font-semibold tracking-wide">About</span>
+          </button>
         </div>
       </div>
 
       {/* Footer Status */}
       <div className="p-4 border-t border-sidebar-border shrink-0 bg-sidebar">
-        <div className="flex items-center gap-2 text-xs font-medium">
+        <div className="flex items-center justify-center gap-2 text-xs font-medium text-center">
           {status?.model_ready ? (
             <>
               <CheckCircle2 className="w-4 h-4 text-success" />
-              <span className="text-foreground/80">{status.model_name || "Model Ready"}</span>
+              <span className="text-foreground/80">Model Connected</span>
             </>
           ) : (
             <>
               <Loader2 className="w-4 h-4 text-warning animate-spin" />
-              <span className="text-warning">Model loading...</span>
+              <span className="text-warning">Getting Things Ready...</span>
             </>
           )}
         </div>
